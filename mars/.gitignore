@@ -1,0 +1,11 @@
+# Ignore virtual environment
+.connecto
+
+# Ignore __pycache__
+__pycache__
+
+# Ignore SQLite database
+*.db
+
+# Ignore log files
+*.log
