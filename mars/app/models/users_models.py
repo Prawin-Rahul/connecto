@@ -1,9 +1,11 @@
 from datetime import datetime
 
 from pytz import timezone
-from app import db
+from app import db , bcrypt
+from flask import request
 
 class UserProfile(db.Model):
+    
     __tablename__ = 'user_profile'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -17,11 +19,19 @@ class UserProfile(db.Model):
     bio = db.Column(db.String,unique=True)
     isVerified = db.Column(db.Boolean,default=False)
     image = db.Column(db.String, nullable=True)
+    password = db.Column(db.String(100))
     # relationship
     posts = db.relationship(
         "UserPost", back_populates="user", cascade="all, delete-orphan"
     ) 
     
+    def set_password(self, raw_password):
+        self.password = bcrypt.generate_password_hash(raw_password).decode("utf-8")
+
+    def check_password(self, raw_password):
+        return bcrypt.check_password_hash(self.password, raw_password)
+
+    # CRUD Ops
     @staticmethod
     def create_user(data):
         if not all(
@@ -40,6 +50,8 @@ class UserProfile(db.Model):
             name = data["name"],
             bio = data["bio"]
         )
+        # hash the password
+        user.set_password(data["password"])
         db.session.add(user)
         db.session.commit()
         return user
@@ -61,25 +73,31 @@ class UserProfile(db.Model):
     
     @staticmethod
     def get_user(id):
+        # send only to latest posts
+        # In UI (Show all posts - then reDirect to all posts url)
         users = UserProfile.query.filter_by(id=id).first()
         _post = []
+        if not users:
+            return None, []
         if users:
             for post in users.posts:
-                _post.append({
-                    "post_id":post.post_id,
-                    "title": post.title,
-                    "content": post.content,
-                    "user_id":post.user_id,
-                    "created_at":post.created_at,
-                    "image":post.image
-                })
-		
+                if len(_post)<3:
+                    _post.append({
+                        "post_id":post.post_id,
+                        "title": post.title,
+                        "content": post.content,
+                        "user_id":post.user_id,
+                        "created_at":post.created_at,
+                        "image":post.image
+                    })
+            
         return users , _post
 
     @staticmethod
-    def delete_user(username):
+    def delete_user(id):
         try:
-            user = UserProfile.query.filter_by(username=username).first()
+            user = UserProfile.query.filter_by(id=id).first()
+            print(user)
             if user:
                 db.session.delete(
                     user
@@ -95,7 +113,6 @@ class UserProfile(db.Model):
     @staticmethod
     def update_user(updates,id):
         try:    
-            print(updates)
             user = UserProfile.query.filter_by(id=id).first()
             if not user:
                 return None
@@ -109,6 +126,3 @@ class UserProfile(db.Model):
             raise e
 
 
-
-## how to keep created time static 
-# only change Updated_time
